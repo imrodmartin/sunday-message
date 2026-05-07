@@ -1,0 +1,49 @@
+name: Update Sunday Message
+
+on:
+  # Runs every Thursday at 9:00 AM EDT (13:00 UTC)
+  schedule:
+    - cron: '0 13 * * 4'
+
+  # Manual trigger with title and scripture inputs
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Message title'
+        required: true
+      scripture:
+        description: 'Scripture reference'
+        required: true
+
+# Edit these each week for the scheduled Thursday run
+env:
+  DEFAULT_TITLE: 'Message Title'
+  DEFAULT_SCRIPTURE: 'Book 0:0'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Update message
+        run: |
+          TITLE="${{ github.event.inputs.title || env.DEFAULT_TITLE }}"
+          SCRIPTURE="${{ github.event.inputs.scripture || env.DEFAULT_SCRIPTURE }}"
+          python3 update_message.py "$TITLE" "$SCRIPTURE"
+          echo "MSG_TITLE=$TITLE" >> $GITHUB_ENV
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --staged --quiet || git commit -m "Update Sunday message: $MSG_TITLE"
+          git push
