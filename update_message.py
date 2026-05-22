@@ -6,9 +6,9 @@ Requires env vars: GMAIL_USER, GMAIL_APP_PASSWORD
 """
 import imaplib
 import email
+from email.utils import parsedate_to_datetime
 import re
 import os
-from datetime import datetime, timedelta
 
 GMAIL_USER = os.environ["GMAIL_USER"]
 GMAIL_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
@@ -18,13 +18,31 @@ SUBJECT_KEYWORD = "Scripture and Title"
 def fetch_email_body():
     with imaplib.IMAP4_SSL("imap.gmail.com") as mail:
         mail.login(GMAIL_USER, GMAIL_PASSWORD)
-        mail.select("inbox")
-        since_date = (datetime.now() - timedelta(days=7)).strftime("%d-%b-%Y")
-        _, msg_ids = mail.search(None, f'SINCE {since_date} SUBJECT "{SUBJECT_KEYWORD}"')
+        mail.select('"[Gmail]/All Mail"')
+        _, msg_ids = mail.search(None, f'SUBJECT "{SUBJECT_KEYWORD}"')
         if not msg_ids[0]:
-            raise ValueError(f"No emails found with subject containing '{SUBJECT_KEYWORD}' in the last 7 days")
-        latest_id = msg_ids[0].split()[-1]
-        _, msg_data = mail.fetch(latest_id, "(RFC822)")
+            raise ValueError(f"No emails found with subject containing '{SUBJECT_KEYWORD}'")
+
+        ids = msg_ids[0].split()
+
+        # Fetch INTERNALDATE for all matches and pick the newest
+        best_id = None
+        best_date = None
+        for msg_id in ids:
+            _, date_data = mail.fetch(msg_id, "(INTERNALDATE)")
+            date_str = date_data[0].decode()
+            # e.g. '1 (INTERNALDATE "22-May-2026 08:00:00 -0500")'
+            match = re.search(r'INTERNALDATE "([^"]+)"', date_str)
+            if match:
+                msg_date = parsedate_to_datetime(match.group(1))
+                if best_date is None or msg_date > best_date:
+                    best_date = msg_date
+                    best_id = msg_id
+
+        if best_id is None:
+            raise ValueError("Could not determine email dates")
+
+        _, msg_data = mail.fetch(best_id, "(RFC822)")
         msg = email.message_from_bytes(msg_data[0][1])
         if msg.is_multipart():
             for part in msg.walk():
