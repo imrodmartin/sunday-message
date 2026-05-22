@@ -44,6 +44,7 @@ def fetch_email_body():
         if best_id is None:
             raise ValueError("Could not determine email dates")
 
+        print(f"Fetching email id={best_id} date={best_date}")
         _, msg_data = mail.fetch(best_id, "(RFC822)")
         msg = email.message_from_bytes(msg_data[0][1])
         if msg.is_multipart():
@@ -54,11 +55,24 @@ def fetch_email_body():
 
 
 def parse_title(body):
-    # Match text inside straight or curly double quotes
-    match = re.search(r'[""]([^""\n]+)[""]', body)
-    if not match:
-        raise ValueError("No quoted title found in email body")
-    return match.group(1).strip()
+    print("--- EMAIL BODY ---")
+    print(body[:500])
+    print("--- END BODY ---")
+
+    # Try: quoted title with closing quote (straight or curly), possibly spanning lines
+    match = re.search(r'[""]([^""]+)[""]', body, re.DOTALL)
+    if match:
+        # Grab only the first line of the match (in case it spans multiple lines)
+        title = match.group(1).split('\n')[0].strip()
+        if title:
+            return title
+
+    # Fallback: opening quote with no closing — grab to end of that line
+    match = re.search(r'[""]([^\n""]+)', body)
+    if match:
+        return match.group(1).strip()
+
+    raise ValueError("No quoted title found in email body")
 
 
 def parse_scripture(body):
