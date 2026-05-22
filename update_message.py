@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 update_message.py
-Reads the latest "Scripture and Title" email from Gmail and updates index.html.
+Reads the latest "Title and scripture" / "Scripture and Title" email from Gmail
+and updates index.html.
 Requires env vars: GMAIL_USER, GMAIL_APP_PASSWORD
 """
 import imaplib
@@ -12,16 +13,18 @@ import os
 
 GMAIL_USER = os.environ["GMAIL_USER"]
 GMAIL_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
-SUBJECT_KEYWORD = "Scripture and Title"
 
 
 def fetch_email_body():
     with imaplib.IMAP4_SSL("imap.gmail.com") as mail:
         mail.login(GMAIL_USER, GMAIL_PASSWORD)
         mail.select('"[Gmail]/All Mail"')
-        _, msg_ids = mail.search(None, f'SUBJECT "{SUBJECT_KEYWORD}"')
+        _, msg_ids = mail.search(
+            None,
+            'OR SUBJECT "Scripture and Title" SUBJECT "Title and scripture"'
+        )
         if not msg_ids[0]:
-            raise ValueError(f"No emails found with subject containing '{SUBJECT_KEYWORD}'")
+            raise ValueError("No emails found with subject 'Scripture and Title' or 'Title and scripture'")
 
         ids = msg_ids[0].split()
 
@@ -31,7 +34,6 @@ def fetch_email_body():
         for msg_id in ids:
             _, date_data = mail.fetch(msg_id, "(INTERNALDATE)")
             date_str = date_data[0].decode()
-            # e.g. '1 (INTERNALDATE "22-May-2026 08:00:00 -0500")'
             match = re.search(r'INTERNALDATE "([^"]+)"', date_str)
             if match:
                 msg_date = parsedate_to_datetime(match.group(1))
