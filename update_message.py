@@ -8,6 +8,7 @@ import imaplib
 import email
 import re
 import os
+from datetime import datetime, timedelta
 
 GMAIL_USER = os.environ["GMAIL_USER"]
 GMAIL_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
@@ -18,9 +19,10 @@ def fetch_email_body():
     with imaplib.IMAP4_SSL("imap.gmail.com") as mail:
         mail.login(GMAIL_USER, GMAIL_PASSWORD)
         mail.select("inbox")
-        _, msg_ids = mail.search(None, f'SUBJECT "{SUBJECT_KEYWORD}"')
+        since_date = (datetime.now() - timedelta(days=7)).strftime("%d-%b-%Y")
+        _, msg_ids = mail.search(None, f'SINCE {since_date} SUBJECT "{SUBJECT_KEYWORD}"')
         if not msg_ids[0]:
-            raise ValueError(f"No emails found with subject containing '{SUBJECT_KEYWORD}'")
+            raise ValueError(f"No emails found with subject containing '{SUBJECT_KEYWORD}' in the last 7 days")
         latest_id = msg_ids[0].split()[-1]
         _, msg_data = mail.fetch(latest_id, "(RFC822)")
         msg = email.message_from_bytes(msg_data[0][1])
@@ -33,7 +35,7 @@ def fetch_email_body():
 
 def parse_title(body):
     # Match text inside straight or curly double quotes
-    match = re.search(r'[“"]([^”"\n]+)[”"]', body)
+    match = re.search(r'[""]([^""\n]+)[""]', body)
     if not match:
         raise ValueError("No quoted title found in email body")
     return match.group(1).strip()
