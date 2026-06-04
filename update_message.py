@@ -72,6 +72,22 @@ def parse_title(body):
     if match:
         return match.group(1).strip()
 
+    # Fallback: unquoted body like "Scripture, Title" or "Title, Scripture".
+    # Take the first non-empty line, strip the scripture reference out, and
+    # what remains (minus surrounding commas/quotes/whitespace) is the title.
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        title = re.sub(
+            r'\b(?:\d\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\s+\d+:\d+(?:[–\-]\d+)?\b',
+            '', line, count=1,
+        ).strip()
+        title = title.strip(' ,\t"“”\'')
+        if title:
+            return title
+        break
+
     raise ValueError("No quoted title found in email body")
 
 
